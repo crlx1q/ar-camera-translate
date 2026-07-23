@@ -42,8 +42,8 @@ jobs:
           for path in ["android/app/build.gradle.kts", "android/app/build.gradle"]:
               if os.path.exists(path):
                   s = open(path, encoding="utf-8").read()
-                  s = s.replace("flutter.compileSdkVersion", "35")
-                  s = s.replace("flutter.targetSdkVersion", "35")
+                  s = s.replace("flutter.compileSdkVersion", "36")
+                  s = s.replace("flutter.targetSdkVersion", "36")
                   s = s.replace("flutter.minSdkVersion", "23")
                   open(path, "w", encoding="utf-8").write(s)
                   print("patched", path)
