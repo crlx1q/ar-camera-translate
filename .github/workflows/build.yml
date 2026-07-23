@@ -1,0 +1,78 @@
+name: Build APK
+
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build-apk:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      - name: Flutter version
+        run: flutter --version
+
+      - name: Scaffold Android platform
+        run: |
+          flutter create --platforms=android --org com.arcam --project-name ar_translate /tmp/scaffold
+          cp -r /tmp/scaffold/android ./android
+
+      - name: Patch Android config (SDK + permissions)
+        run: |
+          python3 - <<'PY'
+          import os
+          for path in ["android/app/build.gradle.kts", "android/app/build.gradle"]:
+              if os.path.exists(path):
+                  s = open(path, encoding="utf-8").read()
+                  s = s.replace("flutter.compileSdkVersion", "35")
+                  s = s.replace("flutter.targetSdkVersion", "35")
+                  s = s.replace("flutter.minSdkVersion", "23")
+                  open(path, "w", encoding="utf-8").write(s)
+                  print("patched", path)
+          mf = "android/app/src/main/AndroidManifest.xml"
+          s = open(mf, encoding="utf-8").read()
+          perms = '    <uses-permission android:name="android.permission.CAMERA"/>\n    <uses-permission android:name="android.permission.INTERNET"/>\n'
+          tag = '<manifest xmlns:android="http://schemas.android.com/apk/res/android">'
+          if tag in s:
+              s = s.replace(tag, tag + "\n" + perms, 1)
+              open(mf, "w", encoding="utf-8").write(s)
+          print(s)
+          PY
+
+      - name: Get dependencies
+        run: flutter pub get
+
+      - name: Build APK (release)
+        run: flutter build apk --release
+
+      - name: Upload APK artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ar-camera-translate-apk
+          path: build/app/outputs/flutter-apk/app-release.apk
+
+      - name: Publish Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: build-${{ github.run_number }}
+          name: AR Camera Translate build ${{ github.run_number }}
+          files: build/app/outputs/flutter-apk/app-release.apk
+          body: "Automated APK build. Download app-release.apk below and install on Android (enable install from unknown sources)."
