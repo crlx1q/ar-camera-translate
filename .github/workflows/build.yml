@@ -3,6 +3,10 @@ name: Build APK
 on:
   push:
     branches: [ main ]
+    paths-ignore:
+      - 'docs/**'
+      - '.github/workflows/pages.yml'
+      - 'README.md'
   workflow_dispatch:
 
 permissions:
@@ -35,7 +39,7 @@ jobs:
           flutter create --platforms=android --org com.arcam --project-name ar_translate /tmp/scaffold
           cp -r /tmp/scaffold/android ./android
 
-      - name: Patch Android config (SDK + permissions)
+      - name: Patch Android config (SDK, minify, permissions)
         run: |
           python3 - <<'PY'
           import os
@@ -45,6 +49,15 @@ jobs:
                   s = s.replace("flutter.compileSdkVersion", "36")
                   s = s.replace("flutter.targetSdkVersion", "36")
                   s = s.replace("flutter.minSdkVersion", "23")
+                  # Disable R8/minify so ML Kit optional recognizers are not stripped.
+                  s = s.replace(
+                      'signingConfig = signingConfigs.getByName("debug")',
+                      'signingConfig = signingConfigs.getByName("debug")\n            isMinifyEnabled = false\n            isShrinkResources = false',
+                  )
+                  s = s.replace(
+                      "signingConfig signingConfigs.debug",
+                      "signingConfig signingConfigs.debug\n            minifyEnabled false\n            shrinkResources false",
+                  )
                   open(path, "w", encoding="utf-8").write(s)
                   print("patched", path)
           mf = "android/app/src/main/AndroidManifest.xml"
